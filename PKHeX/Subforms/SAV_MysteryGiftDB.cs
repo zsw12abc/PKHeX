@@ -1,4 +1,5 @@
-﻿using System;
+﻿using PKHeX.Reflection;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
@@ -256,7 +257,7 @@ namespace PKHeX
                         let eval = line[0] == '='
                         let split = line.Substring(1).Split('=')
                         where split.Length == 2 && !string.IsNullOrWhiteSpace(split[0])
-                        select new BatchEditor.StringInstruction { PropertyName = split[0], PropertyValue = split[1], Evaluator = eval }).ToArray();
+                        select new BatchEditor.BatchEditorStringInstruction { PropertyName = split[0], PropertyValue = split[1], Evaluator = eval }).ToArray();
 
                 if (filters.Any(z => string.IsNullOrWhiteSpace(z.PropertyValue)))
                 { Util.Error("Empty Filter Value detected."); return; }

@@ -4,7 +4,7 @@ using System.Globalization;
 using System.Linq;
 using System.Reflection;
 
-namespace PKHeX
+namespace PKHeX.Reflection
 {
     public static partial class ReflectUtil
     {

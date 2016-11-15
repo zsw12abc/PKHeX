@@ -1,4 +1,5 @@
-﻿using System;
+﻿using PKHeX.Reflection;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Globalization;
@@ -132,7 +133,7 @@ namespace PKHeX
         
         // Mass Editing
         private int ctr, len, err;
-        private IEnumerable<StringInstruction> getFilters()
+        private IEnumerable<BatchEditorStringInstruction> getFilters()
         {
             var raw =
                 RTB_Instructions.Lines
@@ -143,9 +144,9 @@ namespace PKHeX
                    let eval = line[0] == '='
                    let split = line.Substring(1).Split('=')
                    where split.Length == 2 && !string.IsNullOrWhiteSpace(split[0])
-                   select new StringInstruction {PropertyName = split[0], PropertyValue = split[1], Evaluator = eval};
+                   select new BatchEditorStringInstruction {PropertyName = split[0], PropertyValue = split[1], Evaluator = eval};
         }
-        private IEnumerable<StringInstruction> getInstructions()
+        private IEnumerable<BatchEditorStringInstruction> getInstructions()
         {
             var raw =
                 RTB_Instructions.Lines
@@ -156,9 +157,9 @@ namespace PKHeX
             return from line in raw
                    select line.Split('=') into split
                    where split.Length == 2
-                   select new StringInstruction { PropertyName = split[0], PropertyValue = split[1] };
+                   select new BatchEditorStringInstruction { PropertyName = split[0], PropertyValue = split[1] };
         }
-        private void processSAV(PKM[] data, List<StringInstruction> Filters, List<StringInstruction> Instructions)
+        private void processSAV(PKM[] data, List<BatchEditorStringInstruction> Filters, List<BatchEditorStringInstruction> Instructions)
         {
             len = err = ctr = 0;
             for (int i = 0; i < data.Length; i++)
@@ -170,12 +171,12 @@ namespace PKHeX
                     continue;
                 }
 
-                ModifyResult r = ProcessPKM(pkm, Filters, Instructions);
-                if (r != ModifyResult.Invalid)
+                BatchEditorModifyResult r = ProcessPKM(pkm, Filters, Instructions);
+                if (r != BatchEditorModifyResult.Invalid)
                     len++;
-                if (r == ModifyResult.Error)
+                if (r == BatchEditorModifyResult.Error)
                     err++;
-                if (r == ModifyResult.Modified)
+                if (r == BatchEditorModifyResult.Modified)
                 {
                     if (pkm.Species != 0)
                         pkm.RefreshChecksum();
@@ -187,7 +188,7 @@ namespace PKHeX
 
             Main.SAV.BoxData = data;
         }
-        private void processFolder(string[] files, List<StringInstruction> Filters, List<StringInstruction> Instructions, string destPath)
+        private void processFolder(string[] files, List<BatchEditorStringInstruction> Filters, List<BatchEditorStringInstruction> Instructions, string destPath)
         {
             len = err = ctr = 0;
             for (int i = 0; i < files.Length; i++)
@@ -208,12 +209,12 @@ namespace PKHeX
                     continue;
                 }
 
-                ModifyResult r = ProcessPKM(pkm, Filters, Instructions);
-                if (r != ModifyResult.Invalid)
+                BatchEditorModifyResult r = ProcessPKM(pkm, Filters, Instructions);
+                if (r != BatchEditorModifyResult.Invalid)
                     len++;
-                if (r == ModifyResult.Error)
+                if (r == BatchEditorModifyResult.Error)
                     err++;
-                if (r == ModifyResult.Modified)
+                if (r == BatchEditorModifyResult.Modified)
                 {
                     if (pkm.Species > 0)
                     {
@@ -225,23 +226,7 @@ namespace PKHeX
 
                 b.ReportProgress(i);
             }
-        }
-        public static void screenStrings(IEnumerable<StringInstruction> il)
-        {
-            foreach (var i in il.Where(i => !i.PropertyValue.All(char.IsDigit)))
-            {
-                switch (i.PropertyName)
-                {
-                    case "Species": i.setScreenedValue(Main.GameStrings.specieslist); continue;
-                    case "HeldItem": i.setScreenedValue(Main.GameStrings.itemlist); continue;
-                    case "Move1": case "Move2": case "Move3": case "Move4": i.setScreenedValue(Main.GameStrings.movelist); continue;
-                    case "RelearnMove1": case "RelearnMove2": case "RelearnMove3": case "RelearnMove4": i.setScreenedValue(Main.GameStrings.movelist); continue;
-                    case "Ability": i.setScreenedValue(Main.GameStrings.abilitylist); continue;
-                    case "Nature": i.setScreenedValue(Main.GameStrings.natures); continue;
-                    case "Ball": i.setScreenedValue(Main.GameStrings.balllist); continue;
-                }
-            }
-        }
+        }        
         
         private void tabMain_DragEnter(object sender, DragEventArgs e)
         {
@@ -259,28 +244,10 @@ namespace PKHeX
         }
 
         // Utility Methods
-        public class StringInstruction
-        {
-            public string PropertyName;
-            public string PropertyValue;
-            public bool Evaluator;
-            public void setScreenedValue(string[] arr)
-            {
-                int index = Array.IndexOf(arr, PropertyValue);
-                PropertyValue = index > -1 ? index.ToString() : PropertyValue;
-            }
-        }
-        private enum ModifyResult
-        {
-            Invalid,
-            Error,
-            Filtered,
-            Modified,
-        }
-        private static ModifyResult ProcessPKM(PKM PKM, IEnumerable<StringInstruction> Filters, IEnumerable<StringInstruction> Instructions)
+        private static BatchEditorModifyResult ProcessPKM(PKM PKM, IEnumerable<BatchEditorStringInstruction> Filters, IEnumerable<BatchEditorStringInstruction> Instructions)
         {
             if (!PKM.ChecksumValid || PKM.Species == 0)
-                return ModifyResult.Invalid;
+                return BatchEditorModifyResult.Invalid;
 
             Type pkm = PKM.GetType();
 
@@ -289,18 +256,18 @@ namespace PKHeX
                 try
                 {
                     if (!pkm.HasProperty(cmd.PropertyName))
-                        return ModifyResult.Filtered;
+                        return BatchEditorModifyResult.Filtered;
                     if (ReflectUtil.GetValueEquals(PKM, cmd.PropertyName, cmd.PropertyValue) != cmd.Evaluator)
-                        return ModifyResult.Filtered;
+                        return BatchEditorModifyResult.Filtered;
                 }
                 catch
                 {
                     Console.WriteLine($"Unable to compare {cmd.PropertyName} to {cmd.PropertyValue}.");
-                    return ModifyResult.Filtered;
+                    return BatchEditorModifyResult.Filtered;
                 }
             }
 
-            ModifyResult result = ModifyResult.Error;
+            BatchEditorModifyResult result = BatchEditorModifyResult.Error;
             foreach (var cmd in Instructions)
             {
                 try
@@ -322,7 +289,7 @@ namespace PKHeX
                     else
                         ReflectUtil.SetValue(PKM, cmd.PropertyName, cmd.PropertyValue);
 
-                    result = ModifyResult.Modified;
+                    result = BatchEditorModifyResult.Modified;
                 }
                 catch { Console.WriteLine($"Unable to set {cmd.PropertyName} to {cmd.PropertyValue}."); }
             }

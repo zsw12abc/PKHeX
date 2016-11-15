@@ -248,32 +248,12 @@ namespace PKHeX
 
             if (RTB_Instructions.Lines.Any(line => line.Length > 0))
             {
-                var raw =
-                    RTB_Instructions.Lines
-                        .Where(line => !string.IsNullOrWhiteSpace(line))
-                        .Where(line => new[] { '!', '=' }.Contains(line[0]));
-
-                var filters = (from line in raw
-                        let eval = line[0] == '='
-                        let split = line.Substring(1).Split('=')
-                        where split.Length == 2 && !string.IsNullOrWhiteSpace(split[0])
-                        select new BatchEditor.BatchEditorStringInstruction { PropertyName = split[0], PropertyValue = split[1], Evaluator = eval }).ToArray();
+                var filters = ReflectUtil.getFilters(RTB_Instructions.Lines);
 
                 if (filters.Any(z => string.IsNullOrWhiteSpace(z.PropertyValue)))
                 { Util.Error("Empty Filter Value detected."); return; }
 
-                res = res.Where(gift => // Compare across all filters
-                {
-                    foreach (var cmd in filters)
-                    {
-                        if (!gift.GetType().HasPropertyAll(cmd.PropertyName))
-                            return false;
-                        try { if (ReflectUtil.GetValueEquals(gift, cmd.PropertyName, cmd.PropertyValue) == cmd.Evaluator) continue; }
-                        catch { Console.WriteLine($"Unable to compare {cmd.PropertyName} to {cmd.PropertyValue}."); }
-                        return false;
-                    }
-                    return true;
-                });
+                res = ReflectUtil.applyFilters(res, filters);
             }
 
             var results = res.ToArray();

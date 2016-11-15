@@ -55,6 +55,7 @@
     <Compile Include="PKM\DateTestPKM.cs" />
     <Compile Include="PKM\PKMTests.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Reflection\ReflectUtilTests.cs" />
     <Compile Include="Util\DateUtilTests.cs" />
   </ItemGroup>
   <ItemGroup>
@@ -63,6 +64,7 @@
       <Name>PKHeX</Name>
     </ProjectReference>
   </ItemGroup>
+  <ItemGroup />
   <Choose>
     <When Condition="'$(VisualStudioVersion)' == '10.0' And '$(IsCodedUITest)' == 'True'">
       <ItemGroup>

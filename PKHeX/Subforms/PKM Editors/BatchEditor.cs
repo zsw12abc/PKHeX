@@ -19,10 +19,8 @@ namespace PKHeX
             CB_Format.SelectedIndex = CB_Require.SelectedIndex = 0;
         }
 
-        private const string CONST_RAND = "$rand";
-        private const string CONST_SHINY = "$shiny";
         private int currentFormat = -1;
-        private static readonly string[] pk7 = ReflectUtil.getPropertiesCanWritePublic(typeof(PK6)).OrderBy(i => i).ToArray();
+        private static readonly string[] pk7 = ReflectUtil.getPropertiesCanWritePublic(typeof(PK6)).OrderBy(i=>i).ToArray();
         private static readonly string[] pk6 = ReflectUtil.getPropertiesCanWritePublic(typeof(PK6)).OrderBy(i=>i).ToArray();
         private static readonly string[] pk5 = ReflectUtil.getPropertiesCanWritePublic(typeof(PK5)).OrderBy(i=>i).ToArray();
         private static readonly string[] pk4 = ReflectUtil.getPropertiesCanWritePublic(typeof(PK4)).OrderBy(i=>i).ToArray();
@@ -60,11 +58,11 @@ namespace PKHeX
         private BackgroundWorker b = new BackgroundWorker { WorkerReportsProgress = true };
         private void runBackgroundWorker()
         {
-            var Filters = getFilters().ToList();
+            var Filters = ReflectUtil.getFilters(RTB_Instructions.Lines).ToList();
             if (Filters.Any(z => string.IsNullOrWhiteSpace(z.PropertyValue)))
             { Util.Error("Empty Filter Value detected."); return; }
 
-            var Instructions = getInstructions().ToList();
+            var Instructions = ReflectUtil.getInstructions(RTB_Instructions.Lines).ToList();
             if (Instructions.Any(z => string.IsNullOrWhiteSpace(z.PropertyValue)))
             { Util.Error("Empty Property Value detected."); return; }
 
@@ -83,8 +81,6 @@ namespace PKHeX
             FLP_RB.Enabled = RTB_Instructions.Enabled = B_Go.Enabled = false;
 
             b = new BackgroundWorker {WorkerReportsProgress = true};
-            screenStrings(Filters);
-            screenStrings(Instructions);
 
             b.DoWork += (sender, e) => {
                 if (RB_SAV.Checked)
@@ -133,32 +129,6 @@ namespace PKHeX
         
         // Mass Editing
         private int ctr, len, err;
-        private IEnumerable<BatchEditorStringInstruction> getFilters()
-        {
-            var raw =
-                RTB_Instructions.Lines
-                    .Where(line => !string.IsNullOrWhiteSpace(line))
-                    .Where(line => new[] {'!','='}.Contains(line[0]));
-
-            return from line in raw
-                   let eval = line[0] == '='
-                   let split = line.Substring(1).Split('=')
-                   where split.Length == 2 && !string.IsNullOrWhiteSpace(split[0])
-                   select new BatchEditorStringInstruction {PropertyName = split[0], PropertyValue = split[1], Evaluator = eval};
-        }
-        private IEnumerable<BatchEditorStringInstruction> getInstructions()
-        {
-            var raw =
-                RTB_Instructions.Lines
-                    .Where(line => !string.IsNullOrEmpty(line))
-                    .Where(line => new[] {'.'}.Contains(line[0]))
-                    .Select(line => line.Substring(1));
-
-            return from line in raw
-                   select line.Split('=') into split
-                   where split.Length == 2
-                   select new BatchEditorStringInstruction { PropertyName = split[0], PropertyValue = split[1] };
-        }
         private void processSAV(PKM[] data, List<BatchEditorStringInstruction> Filters, List<BatchEditorStringInstruction> Instructions)
         {
             len = err = ctr = 0;
@@ -171,7 +141,7 @@ namespace PKHeX
                     continue;
                 }
 
-                BatchEditorModifyResult r = ProcessPKM(pkm, Filters, Instructions);
+                BatchEditorModifyResult r = ReflectUtil.ProcessPKM(pkm, Filters, Instructions);
                 if (r != BatchEditorModifyResult.Invalid)
                     len++;
                 if (r == BatchEditorModifyResult.Error)
@@ -209,7 +179,7 @@ namespace PKHeX
                     continue;
                 }
 
-                BatchEditorModifyResult r = ProcessPKM(pkm, Filters, Instructions);
+                BatchEditorModifyResult r = ReflectUtil.ProcessPKM(pkm, Filters, Instructions);
                 if (r != BatchEditorModifyResult.Invalid)
                     len++;
                 if (r == BatchEditorModifyResult.Error)
@@ -244,57 +214,7 @@ namespace PKHeX
         }
 
         // Utility Methods
-        private static BatchEditorModifyResult ProcessPKM(PKM PKM, IEnumerable<BatchEditorStringInstruction> Filters, IEnumerable<BatchEditorStringInstruction> Instructions)
-        {
-            if (!PKM.ChecksumValid || PKM.Species == 0)
-                return BatchEditorModifyResult.Invalid;
-
-            Type pkm = PKM.GetType();
-
-            foreach (var cmd in Filters)
-            {
-                try
-                {
-                    if (!pkm.HasProperty(cmd.PropertyName))
-                        return BatchEditorModifyResult.Filtered;
-                    if (ReflectUtil.GetValueEquals(PKM, cmd.PropertyName, cmd.PropertyValue) != cmd.Evaluator)
-                        return BatchEditorModifyResult.Filtered;
-                }
-                catch
-                {
-                    Console.WriteLine($"Unable to compare {cmd.PropertyName} to {cmd.PropertyValue}.");
-                    return BatchEditorModifyResult.Filtered;
-                }
-            }
-
-            BatchEditorModifyResult result = BatchEditorModifyResult.Error;
-            foreach (var cmd in Instructions)
-            {
-                try
-                {
-                    if (cmd.PropertyName == "MetDate")
-                        PKM.MetDate = DateTime.ParseExact(cmd.PropertyValue, "yyyyMMdd", CultureInfo.InvariantCulture, DateTimeStyles.None);
-                    else if (cmd.PropertyName == "EggMetDate")
-                        PKM.EggMetDate = DateTime.ParseExact(cmd.PropertyValue, "yyyyMMdd", CultureInfo.InvariantCulture, DateTimeStyles.None);
-                    else if (cmd.PropertyName == "EncryptionConstant" && cmd.PropertyValue == CONST_RAND)
-                        ReflectUtil.SetValue(PKM, cmd.PropertyName, Util.rnd32().ToString());
-                    else if(cmd.PropertyName == "PID" && cmd.PropertyValue == CONST_RAND)
-                        PKM.setPIDGender(PKM.Gender);
-                    else if (cmd.PropertyName == "EncryptionConstant" && cmd.PropertyValue == "PID")
-                        PKM.EncryptionConstant = PKM.PID;
-                    else if (cmd.PropertyName == "PID" && cmd.PropertyValue == CONST_SHINY)
-                        PKM.setShinyPID();
-                    else if (cmd.PropertyName == "Species" && cmd.PropertyValue == "0")
-                        PKM.Data = new byte[PKM.Data.Length];
-                    else
-                        ReflectUtil.SetValue(PKM, cmd.PropertyName, cmd.PropertyValue);
-
-                    result = BatchEditorModifyResult.Modified;
-                }
-                catch { Console.WriteLine($"Unable to set {cmd.PropertyName} to {cmd.PropertyValue}."); }
-            }
-            return result;
-        }
+        
 
         private void B_Add_Click(object sender, EventArgs e)
         {

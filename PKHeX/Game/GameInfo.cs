@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Linq;
 using System.Collections.Generic;
+using System.Threading;
 
 namespace PKHeX
 {
@@ -131,6 +132,11 @@ namespace PKHeX
                 metSM_60000 = get("sm_60000");
 
                 Sanitize();
+            }
+
+            public static GameStrings CreateFromCurrentCulture()
+            {
+                return new GameStrings(Thread.CurrentThread.CurrentCulture.Name.Substring(0, 2));
             }
 
             private void Sanitize()

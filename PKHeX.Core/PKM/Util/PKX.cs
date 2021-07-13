@@ -192,9 +192,9 @@ namespace PKHeX.Core
 
         public static int GetGenderFromPIDAndRatio(uint pid, int gr) => gr switch
         {
-            255 => 2,
-            254 => 1,
-            0 => 0,
+            PersonalInfo.RatioMagicGenderless => 2,
+            PersonalInfo.RatioMagicFemale => 1,
+            PersonalInfo.RatioMagicMale => 0,
             _ => (pid & 0xFF) < gr ? 1 : 0
         };
 
